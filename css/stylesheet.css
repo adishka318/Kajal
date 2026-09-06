@@ -1335,10 +1335,10 @@ audio {
 }
 
 .message p {
-  font-family: 'Happy', sans-serif;
+  font-family: 'Arial','Helvetica', sans-serif;
   font-size: 60px;
   text-transform: uppercase;
-  color: #C4515C;
+  color: #A52A2A;
   text-shadow: 2px 2px 2px #FFF;
   display: none;              /* controlled by JS */
   font-weight: bold;
