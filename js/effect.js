@@ -191,7 +191,7 @@ $('document').ready(function(){
 
 		function msgLoop(i) {
 			if (i < totalMessages - 1) {
-				$messages.eq(i).fadeIn('slow').delay(6000).fadeOut('slow').promise().done(function(){
+				$messages.eq(i).fadeIn('slow').delay(7000).fadeOut('slow').promise().done(function(){
 					msgLoop(i + 1);
 				});
 			} else {
