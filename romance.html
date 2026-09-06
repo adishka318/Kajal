@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Our Memory</title>
+    <style>
+        :root {
+            --bg-color: #0a0507;
+            --card-width: 260px;
+            --card-height: 360px;
+            --accent-color: #daa520;
+            --text-color: #f5f0f2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Playfair Display', 'Didot', 'Georgia', serif;
+            min-height: 100vh;
+            min-height: -webkit-fill-available; /* Fixed viewport height calculation for mobile browsers */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-color);
+            background: radial-gradient(circle at center, #1f1015 0%, #0a0507 100%);
+        }
+
+        html {
+            height: -webkit-fill-available;
+        }
+
+        /* --- Elegant Entry Screen --- */
+        #intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0507;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s ease;
+        }
+
+        #intro-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.02);
+        }
+
+        .enter-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-color);
+            padding: 1rem 2.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: all 0.4s ease;
+            box-shadow: 0 0 20px rgba(218, 165, 32, 0.05);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .enter-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            box-shadow: 0 0 30px rgba(218, 165, 32, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Ambient Background Glows */
+        .blur-glow {
+            position: absolute;
+            width: 100 max(50vw, 300px);
+            height: max(50vw, 300px);
+            background: radial-gradient(circle, rgba(218, 165, 32, 0.03) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-top: 2.5rem;
+            padding: 0 1rem;
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            letter-spacing: 6px;
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+
+        header p {
+            font-size: 0.85rem;
+            font-style: italic;
+            letter-spacing: 2px;
+            color: #a09599;
+        }
+
+        /* --- 3D Stage with Touch Action fix --- */
+        .carousel-stage {
+            position: relative;
+            width: 100%;
+            height: 50vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1200px; 
+            margin: 1rem 0;
+            z-index: 5;
+            cursor: grab;
+            touch-action: none; /* Prevents Android chrome from hijacking the touch swipe for navigation/scrolling */
+        }
+        
+        .carousel-stage:active {
+            cursor: grabbing;
+        }
+
+        .carousel-track {
+            position: relative;
+            width: var(--card-width);
+            height: var(--card-height);
+            transform-style: preserve-3d;
+        }
+
+        /* --- Stacked Card System --- */
+        .card {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            left: 0;
+            top: 0;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+                        opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+                        filter 0.6s ease;
+            pointer-events: none; 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            will-change: transform, opacity; /* Optimizes hardware acceleration on mobile GPUs */
+        }
+
+        .card.active {
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+            display: block;
+        }
+
+        .card.active:hover img {
+            transform: scale(1.05);
+        }
+
+        /* Capture Overlay styling */
+        .card-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 1.5rem 1rem;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        /* Show caption on tap for active mobile card */
+        .card.active .card-caption {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Precise Overlay Controls */
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            color: var(--text-color);
+            font-size: 1.5rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            z-index: 100;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .nav-btn:hover {
+            opacity: 1;
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .prev { left: 8%; }
+        .next { right: 8%; }
+
+        /* Custom Audio Player */
+        .audio-player {
+            background: rgba(20, 15, 17, 0.6);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            z-index: 10;
+            max-width: 360px;
+            width: 90%;
+        }
+
+        .play-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--text-color);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s, background 0.2s;
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            background: var(--accent-color);
+        }
+
+        .play-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: var(--bg-color);
+        }
+
+        .track-info {
+            flex-grow: 1;
+        }
+
+        .track-title {
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            margin-bottom: 0.1rem;
+        }
+
+        .track-artist {
+            font-size: 0.7rem;
+            color: #a09599;
+            letter-spacing: 0.5px;
+        }
+
+        audio {
+            display: none;
+        }
+
+        /* Optimized breakpoints for standard mobile displays */
+        @media (max-width: 768px) {
+            :root {
+                --card-width: 200px;
+                --card-height: 290px;
+            }
+            header h1 { font-size: 1.6rem; letter-spacing: 4px; }
+            .nav-btn { display: none; } /* Relies on smooth swiping mechanics on phone screens */
+            .carousel-stage { height: 45vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="intro-overlay">
+        <button class="enter-btn" onclick="startExperience()">Open Our Memories</button>
+    </div>
+
+    <div class="blur-glow"></div>
+
+    <header>
+        <h1>MOMENTS IN TIME</h1>
+        <p>Every second spent with you</p>
+    </header>
+
+    <div class="carousel-stage" id="stage">
+        <button class="nav-btn prev" onclick="navigate(-1); stopAutoPlay();">&#10218;</button>
+        
+        <div class="carousel-track">
+            <div class="card"><img src="images/img (1).jpeg" alt="Moment 1"><div class="card-caption">We Saw a Movie !</div></div>
+            <div class="card"><img src="images/img (2).jpeg" alt="Moment 2"><div class="card-caption">First Step towards Each other !</div></div>
+            <div class="card"><img src="images/img (3).jpeg" alt="Moment 3"><div class="card-caption">Cute to lagte hai ham Sath me !</div></div>
+            <div class="card"><img src="images/img (4).jpeg" alt="Moment 4"><div class="card-caption">Cute Attitude :)!</div></div>
+            <div class="card"><img src="images/img (11).jpeg" alt="Moment 11"><div class="card-caption">Jab tum Sharmati ho to mujhe apni taraf attract karti ho !</div></div>
+            <div class="card"><img src="images/img (12).jpeg" alt="Moment 12"><div class="card-caption">Finally felt that I cant live without you !</div></div>
+            <div class="card"><img src="images/img (13).jpeg" alt="Moment 13"><div class="card-caption">Where Roses ! you and me there !</div></div>
+            <div class="card"><img src="images/img (5).jpeg" alt="Moment 5"><div class="card-caption">I want to see like this !</div></div>
+            <div class="card"><img src="images/img (6).jpeg" alt="Moment 6"><div class="card-caption">cute and innocent!</div></div>
+            <div class="card"><img src="images/img (7).jpeg" alt="Moment 7"><div class="card-caption">Innocent and sexy Lady!</div></div>
+            <div class="card"><img src="images/img (8).jpeg" alt="Moment 8"><div class="card-caption">Step to green garden !</div></div>
+            <div class="card"><img src="images/img (9).jpeg" alt="Moment 9"><div class="card-caption">Special to me! you look perfect around me !</div></div>
+            <div class="card"><img src="images/img (10).jpeg" alt="Moment 10"><div class="card-caption">Tired lady but still cute !</div></div>
+            <div class="card"><img src="images/img (14).jpeg" alt="Moment 14"><div class="card-caption">When I saw this picture I see a mom of my Babies !</div></div>
+            <div class="card"><img src="images/img (15).jpeg" alt="Moment 15"><div class="card-caption">Best place for me !</div></div>
+            <div class="card"><img src="images/img (16).jpeg" alt="Moment 16"><div class="card-caption">Sirf Mujhe Dekha Karo !</div></div>
+            <div class="card"><img src="images/img (17).jpeg" alt="Moment 17"><div class="card-caption">My Naughty Babe!</div></div>
+            <div class="card"><img src="images/img (18).jpeg" alt="Moment 18"><div class="card-caption">Very Sanskarik Lady !</div></div>
+            <div class="card"><img src="images/img (19).jpeg" alt="Moment 19"><div class="card-caption">So Sweet !</div></div>
+            <div class="card"><img src="images/img (20).jpeg" alt="Moment 20"><div class="card-caption">Your Smile Take me away to Heaven !</div></div>
+            <div class="card"><img src="images/img (21).jpeg" alt="Moment 21"><div class="card-caption">So much Attractive !</div></div>
+            <div class="card"><img src="images/img (22).jpeg" alt="Moment 22"><div class="card-caption">Give me So much Happiness When I see Your Smile!</div></div>
+			<div class="card"><img src="images/img (23).jpeg" alt="Moment 23"><div class="card-caption">Cute !</div></div>
+            <div class="card"><img src="images/img (24).jpeg" alt="Moment 24"><div class="card-caption">Enchanting — have  a near-magical appeal</div></div>
+            <div class="card"><img src="images/img (25).jpeg" alt="Moment 25"><div class="card-caption">Mesmerizing !</div></div>
+            <div class="card"><img src="images/img (26).jpeg" alt="Moment 26"><div class="card-caption">Radiant — Glowing with confidence !</div></div>
+            <div class="card"><img src="images/img (27).jpeg" alt="Moment 27"><div class="card-caption">Irresistible — Impossible to ignore !</div></div>
+            <div class="card"><img src="images/img (28).jpeg" alt="Moment 28"><div class="card-caption">You are a Magnet— Naturally draws people in !</div></div>
+            <div class="card"><img src="images/img (57).jpeg" alt="Moment 57"><div class="card-caption">Me Tumhara hath Marte Dam tak nhi chhodunga !</div></div>
+            <div class="card"><img src="images/img (30).jpeg" alt="Moment 30"><div class="card-caption">Me tumhe achhe achhe bangles Dilaunga aur apne Hatho Se pehnaunga !</div></div>
+            <div class="card"><img src="images/img (31).jpeg" alt="Moment 31"><div class="card-caption">Captivating — Holds your attention effortlessy !</div></div>
+            <div class="card"><img src="images/img (32).jpeg" alt="Moment 32"><div class="card-caption">I want to keep you Hold as it as whole Life !</div></div>
+            <div class="card"><img src="images/img (33).jpeg" alt="Moment 33"><div class="card-caption">Sophisticated —You are Classy and refined.</div></div>
+            <div class="card"><img src="images/img (34).jpeg" alt="Moment 34"><div class="card-caption">You are Distinct — Stands out from the crowd !</div></div>
+            <div class="card"><img src="images/img (35).jpeg" alt="Moment 35"><div class="card-caption">You are more Beautiful than Background !</div></div>
+            <div class="card"><img src="images/img (36).jpeg" alt="Moment 36"><div class="card-caption">Bold — Confident in choices !</div></div>
+            <div class="card"><img src="images/img (37).jpeg" alt="Moment 37"><div class="card-caption">Authentic — Refreshingly real and genuine!</div></div>
+            <div class="card"><img src="images/img (38).jpeg" alt="Moment 38"><div class="card-caption">Sleek — Sharp, stylish appearance or tone</div></div>
+            <div class="card"><img src="images/img (39).jpeg" alt="Moment 39"><div class="card-caption">You are Grounded — Down to earth and steady!</div></div>
+            <div class="card"><img src="images/img (40).jpeg" alt="Moment 40"><div class="card-caption">My Sweet Baby !</div></div>
+            <div class="card"><img src="images/img (41).jpeg" alt="Moment 41"><div class="card-caption">I wish i could see you live in this dress, Because You look Gorgeous !</div></div>
+            <div class="card"><img src="images/img (42).jpeg" alt="Moment 42"><div class="card-caption">Awww  Your Smile uffff ! </div></div>
+            <div class="card"><img src="images/img (43).jpeg" alt="Moment 43"><div class="card-caption">Confident!</div></div>
+            <div class="card"><img src="images/img (44).jpeg" alt="Moment 44"><div class="card-caption">You are easily the most refreshingly real person I’ve talked to in a long time</div></div>
+            <div class="card"><img src="images/img (45).jpeg" alt="Moment 45"><div class="card-caption">A beauty in Red !</div></div>
+            <div class="card"><img src="images/img (46).jpeg" alt="Moment 46"><div class="card-caption">I always catch myself smiling way after see you !</div></div>
+            <div class="card"><img src="images/img (47).jpeg" alt="Moment 47"><div class="card-caption">Mere bachho ki cute Maa !</div></div>
+            <div class="card"><img src="images/img (48).jpeg" alt="Moment 48"><div class="card-caption">I love that you’re totally unapologetic about being yourself !</div></div>
+            <div class="card"><img src="images/img (49).jpeg" alt="Moment 49"><div class="card-caption">You have a genuinely unforgettable presence</div></div>
+            <div class="card"><img src="images/img (50).jpeg" alt="Moment 50"><div class="card-caption">Pyari si bachhi hai tu Because You are magnetic Presence !</div></div>
+            <div class="card"><img src="images/img (51).jpeg" alt="Moment 51"><div class="card-caption">it is My melting point ! </div></div>
+            <div class="card"><img src="images/img (52).jpeg" alt="Moment 52"><div class="card-caption">You have a super sharp sense of humor !</div></div>
+            <div class="card"><img src="images/img (53).jpeg" alt="Moment 53"><div class="card-caption">You are Adorable ! </div></div>
+            <div class="card"><img src="images/img (54).jpeg" alt="Moment 54"><div class="card-caption">Heart taking away !</div></div>
+            <div class="card"><img src="images/img (55).jpeg" alt="Moment 55"><div class="card-caption">Beauty in black,You’re having a class ! </div></div>
+            <div class="card"><img src="images/img (56).jpeg" alt="Moment 56"><div class="card-caption">Will hold your hand in every situtaion because you are my Strength!</div></div>
+            
+			 <div class="card"><img src="images/img (58).jpeg" alt="Moment 58"><div class="card-caption">Our Beloved God They will provide us all happiness!</div></div>
+           
+			</div>
+
+        <button class="nav-btn next" onclick="navigate(1); stopAutoPlay();">&#10219;</button>
+    </div>
+
+    <div class="audio-player">
+        <button class="play-btn" id="playBtn" onclick="togglePlay()">
+            <svg id="playIcon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <div class="track-info">
+            <div class="track-title">Our Shared Melody</div>
+            <div class="track-artist">Aditya & Kajal</div>
+        </div>
+        
+        <audio id="bgSong" loop>
+            <source src="music/Tumhare.mp3" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
+
+    <script>
+        const cards = document.querySelectorAll('.card');
+        const stage = document.getElementById('stage');
+        const totalCards = cards.length;
+        let currentIndex = 0;
+        let autoplayTimer = null;
+
+        // Cover Flow spacing adjustments for narrow mobile layouts
+        const isMobile = window.innerWidth <= 768;
+        const deltaX = isMobile ? 85 : 140;      
+        const deltaZ = isMobile ? -120 : -150;    
+        const rotationY = isMobile ? -35 : -45;   
+        const maxVisible = isMobile ? 2 : 3;      
+
+        function renderCarousel() {
+            cards.forEach((card, index) => {
+                let offset = index - currentIndex;
+
+                if (offset < -totalCards / 2) offset += totalCards;
+                if (offset > totalCards / 2) offset -= totalCards;
+
+                const absOffset = Math.abs(offset);
+
+                if (absOffset <= maxVisible) {
+                    card.style.opacity = '1';
+                    
+                    if (offset === 0) {
+                        card.style.transform = `translateX(0px) translateZ(0px) rotateY(0deg)`;
+                        card.style.filter = 'none';
+                        card.style.zIndex = '10';
+                        card.classList.add('active');
+                    } else {
+                        const dir = offset > 0 ? 1 : -1;
+                        const tx = offset * deltaX + (dir * (isMobile ? 15 : 30));
+                        const tz = absOffset * deltaZ;
+                        const ry = dir * rotationY;
+
+                        card.style.transform = `translateX(${tx}px) translateZ(${tz}px) rotateY(${ry}deg)`;
+                        card.style.filter = `brightness(${0.6 - absOffset * 0.1}) blur(${absOffset * 0.4}px)`;
+                        card.style.zIndex = (10 - absOffset).toString();
+                        card.classList.remove('active');
+                    }
+                } else {
+                    card.style.opacity = '0';
+                    card.style.transform = `translateX(${offset > 0 ? 500 : -500}px) translateZ(-500px)`;
+                    card.classList.remove('active');
+                }
+            });
+        }
+
+        function navigate(direction) {
+            currentIndex = (currentIndex + direction + totalCards) % totalCards;
+            renderCarousel();
+        }
+
+        /* --- Fixed Touch Tracker Logic --- */
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+
+        function handleDragStart(e) {
+            isDragging = true;
+            startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            currentX = startX;
+            stopAutoPlay();
+        }
+
+        function handleDragMove(e) {
+            if (!isDragging) return;
+            currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        }
+
+        function handleDragEnd() {
+            if (!isDragging) return;
+            const diffX = currentX - startX;
+
+            // Threshold requirement to register slide transition
+            if (Math.abs(diffX) > 40) {
+                if (diffX > 0) {
+                    navigate(-1); // Swipe Right -> Show previous
+                } else {
+                    navigate(1);  // Swipe Left -> Show next
+                }
+            }
+            isDragging = false;
+        }
+
+        // Complete Event Bindings for Mobile and Desktop interaction
+        stage.addEventListener('mousedown', handleDragStart);
+        window.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('mouseup', handleDragEnd);
+
+        stage.addEventListener('touchstart', handleDragStart, { passive: true });
+        stage.addEventListener('touchmove', handleDragMove, { passive: true });
+        window.addEventListener('touchend', handleDragEnd);
+
+        /* --- Audio & Autoplay Control --- */
+        const audio = document.getElementById('bgSong');
+        const playIcon = document.getElementById('playIcon');
+
+        function startExperience() {
+            document.getElementById('intro-overlay').classList.add('fade-out');
+            
+            // Critical fix for mobile browsers: audio context triggers on click thread securely
+            audio.play().catch(err => console.log("Audio initialization:", err));
+            startAutoPlay();
+        }
+
+        function startAutoPlay() {
+            if(!autoplayTimer) {
+                autoplayTimer = setInterval(() => navigate(1), 5500);
+            }
+        }
+
+        function stopAutoPlay() {
+            if(autoplayTimer) {
+                clearInterval(autoplayTimer);
+                autoplayTimer = null;
+            }
+        }
+
+        function togglePlay() {
+            if (audio.paused) {
+                audio.play();
+                playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            } else {
+                audio.pause();
+                playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') { navigate(-1); stopAutoPlay(); }
+            if (e.key === 'ArrowRight') { navigate(1); stopAutoPlay(); }
+        });
+
+        // Initialize view layout
+        renderCarousel();
+    </script>
+</body>
+</html>
